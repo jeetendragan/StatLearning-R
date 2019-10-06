@@ -1,0 +1,111 @@
+---
+title: "Model Selection"
+author: "Jeetendra Gan | Student number - 50325023"
+date: "10/5/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## R Markdown
+
+Let's start by exploring the data a bit.
+
+```{r}
+library(ISLR)
+summary(Hitters)
+```
+
+Here are the names of predictors and the response. We will try and predict the response, Salary of a player.
+
+```{r}
+names(Hitters)
+```
+
+There are some missing values here, so before we proceed we will remove them.
+```{r}
+Hitters = na.omit(Hitters)
+```
+
+Let us find the correlation matrix of the features.
+```{r}
+corrgram::corrgram(Hitters)
+```
+
+Let's see how we can do the best subset selection!
+```{r}
+library(leaps)
+#regfit.full = regsubsets(Salary ~., data = Hitters)
+#summary(regfit.full)
+```
+
+It only goes upto 9 variables by default, we want the best subset so let's look at each of the 19 variables.
+```{r}
+regfit.full = regsubsets(Salary~., data = Hitters, nvmax = 19)
+reg.summary = summary(regfit.full)
+reg.summary
+names(reg.summary)
+```
+
+After running through the subset selection, we get 19 models which contain the best models with feaures ranging from 1 to 19. Here are plots for R-square, RSS, Adjusted R-Square values.
+```{r}
+features = 1:length(reg.summary$rsq)
+plot(features, reg.summary$rsq, xlab = "Features", ylab="R^2",  type = "l")
+points(10, reg.summary$rsq[10], pch=20, col="red")
+plot(features, reg.summary$rss, xlab = "Features", ylab="RSS",  type = "l")
+points(10, reg.summary$rss[10], pch=20, col="red")
+plot(features, reg.summary$adjr2, xlab = "Features", ylab = "Adj. R^2",  type = "l")
+fullSubStSummary = reg.summary;
+```
+
+We will select the model with 10 features due to the reasons mentioned below.
+1. The RSS does not reduce much after 10.
+2. The R^2 does not increase much after 10.
+The above two observations indicate that there is not much gain by adding the 11th feature to the model.
+
+```{r}
+plot(regfit.full, scale="Cp")
+coeffBestSubset = coef(regfit.full, 10)
+```
+
+### **Forward Stepwise selection**
+____________________________________
+```{r}
+regfit.fwd = regsubsets(Salary ~ ., data = Hitters, nvmax = 19, method = "forward")
+plot(regfit.fwd, scale="Cp")
+fwdStSummary = summary(regfit.fwd)
+```
+Now, let us plot the R-Square, RSS, Adjusted R-Square for each of the feature subsets.
+```{r}
+x = 1:19
+plot(x, fwdStSummary$rsq, xlab="Subset count",  ylab = "R-Square", type = "b", col="green")
+plot(x, fwdStSummary$rss, xlab="Subset count", ylab = "RSS",  type = "b")
+plot(x, fwdStSummary$adjr2, xlab = "Subset count", ylab = "Adj. R-Square", type = "b")
+```
+
+Now, let us plot BIC for both forward stepwise and best subset selection.
+  
+```{r}
+rangeX = range(x)
+rangeY = range(fullSubStSummary$bic)
+plot(x, fullSubStSummary$bic, xlab = "Feature set", ylab="BIC", type="b", col="red", pch=24)
+par(new = T)
+rangeY = range(fwdStSummary$bic)
+plot(x, fwdStSummary$bic, axes = FALSE, type="b", col="green", xlab = "", ylab="")
+#ylim=range(rangeX, rangeY)
+```
+Now, let us look at the features selected in full subset selection and forward stepwise selection.
+
+**For best subset selection**
+```{r}
+coeffFwdSubset = coef(regfit.full, 10)
+coeffBestSubset
+```
+**For forward stepwise selection **
+```{r}
+coeffFwdSubset
+```
+
+In both the cases, same features are selected. They even have the same values.

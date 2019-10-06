@@ -1,0 +1,26 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1570139477485.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "A5545746",
+    "lastKnownWriteTime" : 1570145527,
+    "last_content_update" : 1570145527852,
+    "path" : "~/Documents/Source/Repos/StatLearning-R/LinearRegression.r",
+    "project_path" : "LinearRegression.r",
+    "properties" : {
+        "cursorPosition" : "40,31",
+        "scrollLine" : "40",
+        "tempName" : "Untitled1"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
