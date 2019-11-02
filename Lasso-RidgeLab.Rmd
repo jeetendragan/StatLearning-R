@@ -1,0 +1,119 @@
+---
+title: "Lasso-and-Ridge"
+author: "Jeetendra Gan"
+date: "10/12/2019"
+output: html_document
+---
+
+Loading the ElemStatLearn, and glmnet packages.
+```{r}
+library(ElemStatLearn)
+library(glmnet)
+```
+
+We will be using the prostate data
+```{r}
+data(prostate)
+head(prostate)
+```
+
+Omitting the train column as it is a dummy column. The response variable is lpsa. Dividing the training data into two parts, relavent predictors and the response.
+
+```{r}
+# this is the relavent data, excluding the train predictor
+my_datas <- na.omit(prostate[, 1:9])
+X <- as.matrix(my_datas[, 1:8])
+Y <- my_datas[, 9]
+```
+Here is the set of predictors
+```{r}
+head(X)
+```
+And, here is the response head
+```{r}
+head(Y)
+```
+
+## Fitting a ridge regression model
+```{r}
+ridge.mod = glmnet(X, Y, alpha = 0)
+names(ridge.mod)
+```
+
+We have 9*100 = 900 coefficients, because we have 100 values of lambda.
+```{r}
+dim(coef(ridge.mod))
+plot(ridge.mod)
+```
+
+The rows represent the coefficients and the 100 columns represent different lambda values. So, let us select coefficients for some value of lambda.
+```{r}
+print(paste("Below are the coefficients for the lambda : ",ridge.mod$lambda[10]))
+coef10 = coef(ridge.mod)[, 10]
+print(paste("Largest value of Lambda is: ", ridge.mod$lambda[1]))
+print(paste("Smallest value of Lambda is: ", ridge.mod$lambda[100]))
+print(paste("So, the smallest value will be closest to the least squares solution."))
+```
+
+We can use the predict method to get coefficients of any lambda value we like. 
+```{r}
+predict(ridge.mod, s = 0.005, type = "coefficient")
+```
+
+### Model Selection
+
+```{r}
+set.seed(12345)
+train <- sample(1:nrow(X), round(nrow(X)/2))
+```
+
+Will do validation now
+```{r}
+cvFit = cv.glmnet(X[train, ], Y[train], alpha=0)
+summary(cvFit)
+plot(cvFit)
+```
+
+Now, let us get the best lambda.
+```{r}
+bestLam <- cvFit$lambda.min
+bestLam
+ridge.pred <- predict(ridge.mod, s = bestLam, type="coefficients")
+summary(ridge.pred)
+ridge.pred2 <- predict(ridge.mod, s = bestLam, type="response", newx = X[-train, ])
+y_pred <- ridge.pred2
+y_true <- Y[-train]
+rss = sum((y_pred - y_true)^2)
+rss
+```
+### Moving to LASSO now
+```{r}
+lasso.mod <- glmnet(X[train, ], Y[train], alpha = 1)
+```
+Let us now explore the model returned by glmnet.
+```{r}
+summary(lasso.mod)
+plot(lasso.mod)
+```
+Getting the best lambda through cross validation.
+```{r}
+cv.out = cv.glmnet(X[train, ], Y[train], alpha = 1)
+plot(cv.out)
+lassoBestLam = cv.out$lambda.min
+print(paste("The best lambda is", lassoBestLam))
+```
+Getting the coefficients now for the best lambda.
+```{r}
+predict <- predict(lasso.mod, s = lassoBestLam, type = "coefficients")
+predict
+```
+
+The lasso model with the best lambda has only 3 predictors.
+
+Let us now test the model on train data.
+
+```{r}
+lassoPredictTest <- predict(lasso.mod, s = lassoBestLam, type = "response", newx = X[-train, ])
+lassoRss <- sum((lassoPredictTest - Y[-train])^2)
+print(paste("The lasso RSS is: ",lassoRss))
+```

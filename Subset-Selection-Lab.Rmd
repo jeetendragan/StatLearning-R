@@ -1,0 +1,17 @@
+---
+title: "Subset-Selection-Lab"
+author: "Jeetendra Gan"
+date: "10/12/2019"
+output: html_document
+---
+
+```{r}
+library(MASS)
+library(leaps)
+```
+USing the LEAPS package for subset selection.
+
+Running this on boston data
+```{r}
+data(Boston)
+```

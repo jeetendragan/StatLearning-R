@@ -1,0 +1,121 @@
+---
+title: "Simulated data"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+library(leaps)
+```
+
+In this data set I will generate a simulated data from a known model. The model is to predict the salary of a person as a function of years of experience, number of job changes before, and years since job changed. We will also add a dummy variable which does not affect the Salary, something like number of children.
+
+So, we assume that the model is as follows.
+Salary = 3 + 3 * Exp + 0.5 * Jobs + 4 * CJobExp + 0 * Children + Error
+
+Experience, Jobs, and CJobExp are going to be randomly generated. We just generate 20 samples.
+```{r}
+set.seed(1)
+Exp = floor(runif(20)*10);
+print(Exp)
+```
+
+```{r}
+Jobs = round(runif(20)*10, 1)
+print(Jobs)
+```
+
+```{r}
+CJobExp = round(runif(20)*10, 1)
+print(CJobExp)
+```
+
+```{r}
+Children = floor(runif(20)*5)
+print(Children)
+```
+
+Let us now generate the error from a normal distribution with a mean = 0, and standard deviation of 2.
+```{r}
+error = rnorm(20, 0, 1)
+print(error)
+```
+
+I will now generate the Salary.
+```{r}
+Salary = 3 + 3 * Exp + 0.5 * Jobs + 4 * CJobExp + 0 * Children + error
+print(Salary)
+```
+
+This is the complete data.
+```{r}
+data = data.frame(Exp, Jobs, CJobExp, Children, Salary)
+print(data)
+pairs(data)
+corrgram::corrgram(data)
+```
+
+The correlation of features with salary is as expected because the data comes from a predecided model. 
+
+Let us now divide the data into a validation set(1/3) and an training set(2/3). For that we need to randomly pick samples from the current data.
+This is the training data.
+```{r}
+trainIndices = sample(seq(20), 15, replace = FALSE)
+trainingData = data[trainIndices, ]
+print(trainingData)
+```
+This is the test data.
+```{r}
+validationData = data[-trainIndices, ]
+print(validationData)
+```
+
+Let us use forward subset selection to get models of various sizes.
+```{r}
+trainingSetFit = regsubsets(Salary ~ ., trainingData, nvmax = 4, method = "forward")
+trainSummary = summary(trainingSetFit)
+subsetSize = 1:4
+plot(subsetSize, trainSummary$cp, ylab = "CP", type = "b")
+```
+
+CP, helps us estimate the test error. The lower it is, the better. If it flattens out, it is better to choose a model with less number of features.
+Here are the actual values of CP.
+
+```{r}
+trainSummary$cp
+```
+The CP values clearly indicate that we do not need a model with the 4th feature. But, what is that 4th feature? Let us look at the coefficients.
+```{r}
+coef(trainingSetFit, 1)
+coef(trainingSetFit, 2)
+coef(trainingSetFit, 3)
+coef(trainingSetFit, 4)
+```
+No surprises, it is the 'Children' feature.
+
+Now, let us pass through each of these models the validation set data that we separated out.
+
+```{r}
+testErrors = rep(NA, 19)
+testMatrix = model.matrix(Salary ~ ., validationData)
+for(i in 1:4){
+  coefi = coef(trainingSetFit, id = i)
+  subset = testMatrix[, names(coefi)]
+  predictions = subset%*%coefi
+  testErrors[i] = mean((validationData$Salary - predictions)^2)
+}
+plot(sqrt(testErrors), ylab="Root MSE", pch=19, type="b", ylim=range(0,10), xlim=range(1, 4))
+trainRssMeans = trainingSetFit$rss[-1] / 15
+points(sqrt(trainRssMeans), col = "blue", pch = 19, type = "b")
+legend("topright", legend = c("Training", "Validation"), col=c("blue","black"), pch=19)
+```
+
+As expected, the validation/test error is more than the training error. Both, validation set and Cp indicate that the better model is the following with the 3 variables.
+```{r}
+coef(trainingSetFit, 3)
+```
+
+The above is also very close to the true population model. 
+
+Salary = 3 + 3 * Exp + 0.5 * Jobs + 4 * CJobExp + 0 * Children + Error

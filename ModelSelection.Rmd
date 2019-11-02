@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## R Markdown
@@ -86,7 +86,7 @@ plot(x, fwdStSummary$adjr2, xlab = "Subset count", ylab = "Adj. R-Square", type 
 ```
 
 Now, let us plot BIC for both forward stepwise and best subset selection.
-  
+
 ```{r}
 rangeX = range(x)
 rangeY = range(fullSubStSummary$bic)
@@ -109,3 +109,123 @@ coeffFwdSubset
 ```
 
 In both the cases, same features are selected. They even have the same values.
+
+### Let us now use Validation set to fit the model.
+Following are the dimensions of the Hitters data set.
+```{r}
+dim(Hitters)
+```
+
+We will divide the data set into 2/3rd training and the remaining 1/3rd as the test set. 2/3rd is around 180 samples. We need to randomly pick these samples from the 263 samples.
+
+```{r echo=TRUE}
+set.seed(1)
+trainIndices = sample(seq(263), 180, replace = FALSE)
+trainingSetFit = regsubsets(Salary ~ ., data = Hitters[trainIndices, ], nvmax = 19, method = "forward")
+```
+
+Now, let us pass the validation set data to each of the 19 models.
+```{r}
+# Create a blank vector of length 19
+valErrors = rep(NA, 19)
+test = model.matrix(Salary ~ ., data = Hitters[-trainIndices,])
+for(i in 1:19){
+  coefi = coef(trainingSetFit, id = i)
+  pred = test[, names(coefi)]%*%coefi
+  valErrors[i] = mean((Hitters$Salary[-trainIndices]-pred)^2)
+}
+plot(sqrt(valErrors), ylab="Root MSE", pch=19, type="b",ylim=range(300, 400))
+points(sqrt(trainingSetFit$rss[-1]/180), col = "blue", pch = 19, type = "b")
+legend("topright", legend = c("Training", "Validation"), col=c("blue","black"), pch=19)
+```
+
+```{r}
+predict.regsubsets = function(object, newdata, id, ....){
+  # objects is the regsubsets object
+  form = as.formula((object$call[[2]]))
+  mat = model.matrix(form, newdata)
+  coefi = coef(object, id = id)
+  mat[, names(coefi)]%*%coefi
+}
+```
+
+### Cross validation
+We will do a 10 fold cross validation.
+```{r}
+set.seed(11)
+rep = rep(1:10, length = nrow(Hitters))
+rep
+folds = sample(rep)
+folds
+table(folds)
+cv.errors = matrix(NA, 10, 19)
+for(k in 1:10){
+  foldTrainingData = Hitters[folds != k, ]
+  
+  # train for the kth fold. We get 19 subsets.
+  subsetModels = regsubsets(Salary ~ ., data = foldTrainingData, method = "forward", nvmax = 19)
+  
+  foldTestData  = Hitters[folds == k, ]
+  # iterate over each of the subset models and pass in the validation data to record the error
+  for(p in 1:19){
+     pthPrediction = predict(subsetModels, foldTestData, id = p)
+     cv.errors[k,p] = mean( (foldTestData$Salary - pthPrediction)^2 )
+  }
+}
+
+rmse.cv = sqrt(apply(cv.errors, 2, mean))
+plot(rmse.cv, pch = 19, type="b", xlab = "Subset size", ylab = "Root MSE")
+```
+
+## Ridge regression and Lasso
+
+```{r}
+library(glmnet)
+x = model.matrix(Salary~. -1, data = Hitters)
+y = Hitters$Salary
+```
+ Now let us fit a ridge-regression model. This is achieved by calling `glmnet` with `alpha=0`. There is also a `cv.glmnet` function that will help us do the cross-validation.
+
+```{r}
+fit.ridge = glmnet(x, y, alpha = 0)
+plot(fit.ridge, xvar="lambda", label=TRUE)
+```
+
+Let us use cv.glmnet to compute the MSE for different values of lambda.
+
+```{r}
+cv.ridge = cv.glmnet(x, y, alpha = 0)
+plot(cv.ridge)
+```
+
+Now let us fit a lasso model. For this we use the default `alpha=1`
+```{r}
+fit.lasso = glmnet(x, y)
+plot(fit.lasso, xvar="lambda", label=TRUE)
+cv.lasso = cv.glmnet(x,y)
+plot(cv.lasso)
+coef(cv.lasso)
+```
+
+`coef(cv.lasso)` selects the best model. The best is chosen by selecting the simplest model that is within 1 standard deviation of the lowest MSE.
+
+```{r}
+lasso.tr = glmnet(x[trainIndices,], y[trainIndices])
+lasso.tr
+```
+Df- Number of non-zero coefficients(Degrees of freedom)
+
+%Dev - % of deviance explained
+
+lambda - the corresponding lambda value
+
+```{r}
+pred = predict(lasso.tr, x[-trainIndices, ])
+dim(pred)
+errMat = y[-trainIndices] - pred
+rmse = sqrt(apply(( errMat^2 ), 2, mean))
+plot( log(lasso.tr$lambda), rmse, type="b", xlab="Log(Lambda)" )
+lam.best = lasso.tr$lambda[order(rmse)[1]]
+lam.best
+coef(lasso.tr, s = lam.best)
+```
